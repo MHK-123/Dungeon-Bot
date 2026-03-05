@@ -20,5 +20,5 @@ jobs:
         env:
           DISCORD_TOKEN: ${{ secrets.DISCORD_TOKEN }}
           STAFF_CHANNEL_ID: ${{ secrets.STAFF_CHANNEL_ID }}
-          STAFF_ROLE_ID: ${{ secrets.STAFF_ROLE_ID }}
+          STAFF_ROLE_IDS: ${{ secrets.STAFF_ROLE_IDS }}
         run: python bot.py
