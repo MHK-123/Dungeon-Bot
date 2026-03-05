@@ -7,6 +7,7 @@ TOKEN = os.environ["DISCORD_TOKEN"]
 STAFF_CHANNEL_ID = int(os.environ["STAFF_CHANNEL_ID"])
 STAFF_ROLE_ID = int(os.environ["STAFF_ROLE_ID"])
 
+
 class DungeonKeeper(commands.Bot):
 
     def __init__(self):
@@ -19,8 +20,8 @@ class DungeonKeeper(commands.Bot):
 
         self.case_counter = 1
         self.cases = {}
-        self.blacklisted_users = set()
         self.active_sessions = {}
+        self.blacklisted_users = set()
 
     async def on_ready(self):
         print(f"{self.user} is online")
@@ -38,29 +39,26 @@ class DungeonKeeper(commands.Bot):
             if message.author.id in self.blacklisted_users:
                 return
 
-            # waiting for report message
             if message.author.id in self.active_sessions:
+                await self.create_case(message)
+                self.active_sessions.pop(message.author.id)
+                return
 
-                if self.active_sessions[message.author.id] == "awaiting_report":
-                    await self.create_case(message)
-                    self.active_sessions.pop(message.author.id)
-                    return
-
-            # show start panel
             embed = discord.Embed(
                 title="🛡️ DungeonKeeper Report System",
                 color=discord.Color.blurple(),
                 description=(
-                    "**Use this system to report rule violations.**\n\n"
-                    "📋 **Include:**\n"
-                    "• 👤 Username of the member\n"
-                    "• 📜 What they did\n"
-                    "• 📸 Screenshot evidence\n\n"
+                    "**Report rule violations to staff**\n\n"
+                    "📋 Include:\n"
+                    "• Username of the member\n"
+                    "• What they did\n"
+                    "• Screenshot evidence\n\n"
                     "⚠ False reports may lead to punishment."
                 )
             )
 
             view = StartView(self)
+
             await message.author.send(embed=embed, view=view)
             return
 
@@ -74,7 +72,7 @@ class DungeonKeeper(commands.Bot):
         staff_channel = self.get_channel(STAFF_CHANNEL_ID)
 
         embed = discord.Embed(
-            title=f"🚨 Support Case #{case_id}",
+            title=f"🚨 Report Case #{case_id}",
             color=discord.Color.orange(),
             timestamp=datetime.utcnow()
         )
@@ -86,15 +84,15 @@ class DungeonKeeper(commands.Bot):
         )
 
         embed.add_field(
-            name="Status",
-            value="🟢 OPEN",
-            inline=True
-        )
-
-        embed.add_field(
             name="Report",
             value=message.content,
             inline=False
+        )
+
+        embed.add_field(
+            name="Status",
+            value="🟢 OPEN",
+            inline=True
         )
 
         files = []
@@ -103,7 +101,7 @@ class DungeonKeeper(commands.Bot):
 
         view = StaffButtons(self, case_id, message.author.id)
 
-        msg = await staff_channel.send(embed=embed, view=view, files=files)
+        msg = await staff_channel.send(embed=embed, files=files, view=view)
 
         thread = await msg.create_thread(
             name=f"case-{case_id}-{message.author.name}",
@@ -112,19 +110,16 @@ class DungeonKeeper(commands.Bot):
 
         self.cases[case_id] = {
             "reporter": message.author.id,
-            "thread": thread.id,
-            "status": "OPEN"
+            "thread": thread.id
         }
 
         await message.author.send(
-            f"✅ Report submitted successfully.\nCase ID: **#{case_id}**"
+            f"✅ Your report has been submitted.\nCase ID: **#{case_id}**"
         )
 
 
 bot = DungeonKeeper()
 
-
-# START VIEW
 
 class StartView(discord.ui.View):
 
@@ -135,10 +130,10 @@ class StartView(discord.ui.View):
     @discord.ui.button(label="Proceed", style=discord.ButtonStyle.success)
     async def proceed(self, interaction: discord.Interaction, button):
 
-        self.bot.active_sessions[interaction.user.id] = "awaiting_report"
+        self.bot.active_sessions[interaction.user.id] = True
 
         await interaction.response.send_message(
-            "Please send your report message now with screenshot evidence.",
+            "Send your report message now with screenshot evidence.",
             ephemeral=True
         )
 
@@ -150,8 +145,6 @@ class StartView(discord.ui.View):
             ephemeral=True
         )
 
-
-# STAFF BUTTONS
 
 class StaffButtons(discord.ui.View):
 
@@ -169,20 +162,8 @@ class StaffButtons(discord.ui.View):
                 ephemeral=True
             )
             return False
+
         return True
-
-
-    @discord.ui.button(label="Claim", style=discord.ButtonStyle.primary)
-    async def claim(self, interaction, button):
-
-        if not await self.staff_check(interaction):
-            return
-
-        await interaction.response.send_message(
-            f"{interaction.user.mention} claimed this case.",
-            ephemeral=True
-        )
-
 
     @discord.ui.button(label="Reply", style=discord.ButtonStyle.primary)
     async def reply(self, interaction, button):
@@ -194,7 +175,6 @@ class StaffButtons(discord.ui.View):
             ReplyModal(self.bot, self.case_id, self.reporter_id)
         )
 
-
     @discord.ui.button(label="Warn", style=discord.ButtonStyle.secondary)
     async def warn(self, interaction, button):
 
@@ -202,9 +182,8 @@ class StaffButtons(discord.ui.View):
             return
 
         await interaction.response.send_modal(
-            WarnModal(self.bot, self.case_id, self.reporter_id)
+            WarnModal(self.bot)
         )
-
 
     @discord.ui.button(label="Mute", style=discord.ButtonStyle.secondary)
     async def mute(self, interaction, button):
@@ -213,9 +192,8 @@ class StaffButtons(discord.ui.View):
             return
 
         await interaction.response.send_modal(
-            MuteModal(self.bot, self.case_id, self.reporter_id)
+            MuteModal(self.bot)
         )
-
 
     @discord.ui.button(label="Ban", style=discord.ButtonStyle.danger)
     async def ban(self, interaction, button):
@@ -223,17 +201,11 @@ class StaffButtons(discord.ui.View):
         if not await self.staff_check(interaction):
             return
 
-        user = await self.bot.fetch_user(self.reporter_id)
-
-        await interaction.guild.ban(user)
-
-        await interaction.response.send_message(
-            "User banned.",
-            ephemeral=True
+        await interaction.response.send_modal(
+            BanModal(self.bot)
         )
 
-
-    @discord.ui.button(label="Close", style=discord.ButtonStyle.success)
+    @discord.ui.button(label="Close Case", style=discord.ButtonStyle.success)
     async def close(self, interaction, button):
 
         if not await self.staff_check(interaction):
@@ -243,8 +215,7 @@ class StaffButtons(discord.ui.View):
             CloseModal(self.bot, self.case_id, self.reporter_id)
         )
 
-
-    @discord.ui.button(label="Blacklist", style=discord.ButtonStyle.danger)
+    @discord.ui.button(label="Blacklist Reporter", style=discord.ButtonStyle.danger)
     async def blacklist(self, interaction, button):
 
         if not await self.staff_check(interaction):
@@ -257,8 +228,6 @@ class StaffButtons(discord.ui.View):
             ephemeral=True
         )
 
-
-# MODALS
 
 class ReplyModal(discord.ui.Modal, title="Reply to Reporter"):
 
@@ -282,25 +251,23 @@ class ReplyModal(discord.ui.Modal, title="Reply to Reporter"):
 
         await user.send(embed=embed)
 
-        await interaction.response.send_message(
-            "Reply sent.",
-            ephemeral=True
-        )
+        await interaction.response.send_message("Reply sent.", ephemeral=True)
 
 
 class WarnModal(discord.ui.Modal, title="Warn User"):
 
+    user = discord.ui.TextInput(label="User ID or mention")
     reason = discord.ui.TextInput(label="Reason")
 
-    def __init__(self, bot, case_id, reporter_id):
+    def __init__(self, bot):
         super().__init__()
         self.bot = bot
-        self.case_id = case_id
-        self.reporter_id = reporter_id
 
     async def on_submit(self, interaction):
 
-        user = await self.bot.fetch_user(self.reporter_id)
+        user_id = int(self.user.value.replace("<@", "").replace(">", "").replace("!", ""))
+
+        user = await self.bot.fetch_user(user_id)
 
         embed = discord.Embed(
             title="⚠ Warning from Staff",
@@ -310,43 +277,56 @@ class WarnModal(discord.ui.Modal, title="Warn User"):
 
         await user.send(embed=embed)
 
-        await interaction.response.send_message(
-            "Warning sent.",
-            ephemeral=True
-        )
+        await interaction.response.send_message("Warning sent.", ephemeral=True)
 
 
 class MuteModal(discord.ui.Modal, title="Mute User"):
 
-    duration = discord.ui.TextInput(label="Duration (minutes)")
+    user = discord.ui.TextInput(label="User ID or mention")
+    duration = discord.ui.TextInput(label="Duration in minutes")
     reason = discord.ui.TextInput(label="Reason")
 
-    def __init__(self, bot, case_id, reporter_id):
+    def __init__(self, bot):
         super().__init__()
         self.bot = bot
-        self.case_id = case_id
-        self.reporter_id = reporter_id
 
     async def on_submit(self, interaction):
 
-        member = interaction.guild.get_member(self.reporter_id)
+        user_id = int(self.user.value.replace("<@", "").replace(">", "").replace("!", ""))
 
-        duration_minutes = int(self.duration.value)
+        member = interaction.guild.get_member(user_id)
 
         await member.timeout(
-            timedelta(minutes=duration_minutes),
+            timedelta(minutes=int(self.duration.value)),
             reason=self.reason.value
         )
 
-        await interaction.response.send_message(
-            "User muted.",
-            ephemeral=True
-        )
+        await interaction.response.send_message("User muted.", ephemeral=True)
+
+
+class BanModal(discord.ui.Modal, title="Ban User"):
+
+    user = discord.ui.TextInput(label="User ID or mention")
+    reason = discord.ui.TextInput(label="Reason")
+
+    def __init__(self, bot):
+        super().__init__()
+        self.bot = bot
+
+    async def on_submit(self, interaction):
+
+        user_id = int(self.user.value.replace("<@", "").replace(">", "").replace("!", ""))
+
+        user = await self.bot.fetch_user(user_id)
+
+        await interaction.guild.ban(user, reason=self.reason.value)
+
+        await interaction.response.send_message("User banned.", ephemeral=True)
 
 
 class CloseModal(discord.ui.Modal, title="Close Case"):
 
-    result = discord.ui.TextInput(label="Action Taken")
+    result = discord.ui.TextInput(label="Action taken")
 
     def __init__(self, bot, case_id, reporter_id):
         super().__init__()
