@@ -451,4 +451,4 @@ class WarnModal(discord.ui.Modal, title="Warn User"):
         )
 
 
-bot.run(TOKEN)
+    bot.run(DISCORD_TOKEN)
