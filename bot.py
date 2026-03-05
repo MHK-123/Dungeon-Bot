@@ -3,9 +3,10 @@ from discord.ext import commands
 import os
 from datetime import datetime, timedelta
 
-TOKEN = os.getenv("DISCORD_TOKEN")
-STAFF_CHANNEL_ID = int(os.getenv("STAFF_CHANNEL_ID"))
-STAFF_ROLE_ID = int(os.getenv("STAFF_ROLE_ID"))
+
+DISCORD_TOKEN = os.environ["DISCORD_TOKEN"]
+STAFF_CHANNEL_ID = int(os.environ["STAFF_CHANNEL_ID"])
+STAFF_ROLE_ID = int(os.environ["STAFF_ROLE_ID"])
 
 class DungeonKeeper(commands.Bot):
 
