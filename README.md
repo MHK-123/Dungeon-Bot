@@ -1,4 +1,4 @@
-# DungeonKeeper – Discord DM Report / ModMail Bot
+## DungeonKeeper – Discord DM Report / ModMail Bot
 
 A Discord bot that lets users privately report rule violations via DM, then forwards the report (and attachments) to a staff channel with a case thread and staff action buttons.
 
@@ -12,27 +12,34 @@ A Discord bot that lets users privately report rule violations via DM, then forw
   - **Mute** (timeout) a member for N minutes
   - **Ban** a user
   - **Close Case** (DM reporter with action taken)
-  - **Blacklist Reporter** (blocks future reports from that reporter for this runtime)
+  - **Blacklist Reporter** (blocks future reports from that reporter)
 
 ## Requirements
 
 - Python **3.10+** (3.11+ recommended)
 - `discord.py` **2.x**
-- A Discord application + bot token
+- Supabase project (Postgres) + API keys
 
 ## Setup
 
 1. Install dependencies:
 
 ```bash
-pip install -U discord.py
+pip install -r requirements.txt
 ```
 
-2. Create environment variables:
+2. Create the Supabase tables:
+
+- Open **Supabase → SQL Editor**
+- Paste/run `schema.sql`
+
+3. Create environment variables:
 
 - **`DISCORD_TOKEN`**: your bot token
 - **`STAFF_CHANNEL_ID`**: the channel ID where cases are posted (e.g., `1234567890`)
 - **`STAFF_ROLE_IDS`**: comma-separated role IDs to ping + treat as staff (e.g., `111,222,333`)
+- **`SUPABASE_URL`**: Supabase Project URL
+- **`SUPABASE_SERVICE_ROLE_KEY`**: Supabase service role key (keep secret; server-only)
 
 ### Example (PowerShell)
 
@@ -40,6 +47,8 @@ pip install -U discord.py
 $env:DISCORD_TOKEN="YOUR_TOKEN_HERE"
 $env:STAFF_CHANNEL_ID="123456789012345678"
 $env:STAFF_ROLE_IDS="111111111111111111,222222222222222222"
+$env:SUPABASE_URL="https://YOUR_PROJECT.supabase.co"
+$env:SUPABASE_SERVICE_ROLE_KEY="YOUR_SERVICE_ROLE_KEY"
 python .\bot.py
 ```
 
@@ -81,12 +90,11 @@ Staff can use the buttons on the case message:
 - **Mute**: applies a Discord timeout to the member for the given minutes.
 - **Ban**: bans the specified user.
 - **Close Case**: DMs the reporter the action taken.
-- **Blacklist Reporter**: blocks the reporter from submitting new cases (until bot restarts).
+- **Blacklist Reporter**: blocks the reporter from submitting new cases.
 
 ## Notes / limitations
 
-- **No persistence**: case IDs, blacklist, and sessions reset when the bot restarts.
-- **Buttons after restart**: the staff buttons may stop working after a restart unless views are registered as persistent.
+- **Buttons after restart**: buttons are persistent and load cases by staff message ID from Supabase.
 - **Thread permissions**: thread creation requires permissions in the staff channel.
 
 ## Troubleshooting
@@ -99,4 +107,3 @@ Staff can use the buttons on the case message:
 ## License
 
 See the header in `bot.py` for licensing/usage terms.
-

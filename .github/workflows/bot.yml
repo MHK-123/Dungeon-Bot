@@ -1,0 +1,34 @@
+name: Run DungeonKeeper Bot
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "*/30 * * * *"   # runs every 30 minutes to restart if stopped
+
+jobs:
+  run-bot:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install discord.py
+
+      - name: Run Bot
+        env:
+          DISCORD_TOKEN: ${{ secrets.DISCORD_TOKEN }}
+          STAFF_CHANNEL_ID: ${{ secrets.STAFF_CHANNEL_ID }}
+          STAFF_ROLE_IDS: ${{ secrets.STAFF_ROLE_IDS }}
+        run: |
+          while true; do
+            python bot.py
+            echo "Bot crashed or stopped. Restarting in 5 seconds..."
+            sleep 5
+          done
