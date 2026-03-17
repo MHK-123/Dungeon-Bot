@@ -10,7 +10,10 @@ import discord
 from discord.ext import commands
 import os
 import logging
+import threading
 from typing import Optional
+
+from flask import Flask
 
 from db import setup, add_report, get_reports, delete_report
 
@@ -19,6 +22,22 @@ log = logging.getLogger("dungeonkeeper")
 TOKEN = os.environ.get("DISCORD_TOKEN")
 if not TOKEN:
     raise RuntimeError("Missing required environment variable: DISCORD_TOKEN")
+
+# --- Keep-alive web server (for uptime pings) ---
+# Render Free can sleep after inactivity. This tiny Flask server gives you a URL
+# that UptimeRobot can ping every 5 minutes to keep the service awake.
+_app = Flask(__name__)
+_web_started = False
+
+
+@_app.get("/")
+def alive():
+    return "Bot is alive"
+
+
+def _run_web():
+    # Runs alongside the Discord bot (non-blocking).
+    _app.run(host="0.0.0.0", port=10000)
 
 
 class DungeonKeeper(commands.Bot):
@@ -33,6 +52,13 @@ class DungeonKeeper(commands.Bot):
     async def on_ready(self):
         # Ensure SQLite database and tables exist
         setup()
+
+        # Start the keep-alive server once (on_ready can fire more than once).
+        global _web_started
+        if not _web_started:
+            threading.Thread(target=_run_web, daemon=True).start()
+            _web_started = True
+
         log.info("%s is online", self.user)
 
 
